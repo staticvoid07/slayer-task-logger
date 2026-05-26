@@ -49,12 +49,14 @@ public class SlayerLoggerPlugin extends Plugin
 		"Your new task is to kill (\\d+) (.+)\\."
 	);
 
-	// "You have completed your task! You killed 267 Nechryael. You gained 56,280 xp
-	//  You've completed 3,733 tasks and received 15 points, giving you a total of 2,983; return to a Slayer master."
-	// Note: <br> between the xp line and "You've" is stripped by removeTags(), leaving no separator.
-	private static final Pattern TASK_COMPLETE_PATTERN = Pattern.compile(
-		"You have completed your task! You killed (\\d+) (.+?)\\. You gained ([\\d,]+) (?:Slayer )?[Xx][Pp]\\.?\\s*" +
-		"You've completed (\\d+) tasks? and received (\\d+) points?, giving you a total of ([\\d,]+);"
+	// First message: "You have completed your task! You killed 267 Nechryael. You gained 56,280 xp"
+	private static final Pattern TASK_COMPLETE_PART1_PATTERN = Pattern.compile(
+		"You have completed your task! You killed (\\d+) (.+?)\\. You gained ([\\d,]+) (?:Slayer )?[Xx][Pp]\\.?"
+	);
+
+	// Second message: "You've completed 3,733 tasks and received 15 points, giving you a total of 2,983; return to a Slayer master."
+	private static final Pattern TASK_COMPLETE_PART2_PATTERN = Pattern.compile(
+		"You'?ve completed ([\\d,]+) tasks? and received ([\\d,]+) points?, giving you a total of ([\\d,]+);"
 	);
 
 	private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
@@ -77,6 +79,12 @@ public class SlayerLoggerPlugin extends Plugin
 	private SlayerLoggerConfig config;
 
 	private PrintWriter logWriter;
+
+	// Holds data from part 1 of the split task completion message until part 2 arrives
+	private int pendingKillCount;
+	private String pendingMonster;
+	private String pendingXp;
+	private boolean awaitingCompletionPart2 = false;
 
 	@Override
 	protected void startUp() throws Exception
@@ -101,6 +109,7 @@ public class SlayerLoggerPlugin extends Plugin
 			logWriter.close();
 			logWriter = null;
 		}
+		awaitingCompletionPart2 = false;
 		log.debug("Slayer Logger stopped!");
 	}
 
@@ -120,7 +129,6 @@ public class SlayerLoggerPlugin extends Plugin
 		// Text.removeTags strips all HTML-like tags including color codes (<col=...>) and line breaks.
 		// Text.removeFormattingTags leaves color tags in place, breaking regex matches.
 		String message = Text.removeTags(chatMessage.getMessage());
-		log.debug("Chat [{}]: {}", type, message);
 
 		Matcher taskReceived = TASK_RECEIVED_PATTERN.matcher(message);
 		if (taskReceived.find())
@@ -131,16 +139,27 @@ public class SlayerLoggerPlugin extends Plugin
 			return;
 		}
 
-		Matcher taskComplete = TASK_COMPLETE_PATTERN.matcher(message);
-		if (taskComplete.find())
+		Matcher part1 = TASK_COMPLETE_PART1_PATTERN.matcher(message);
+		if (part1.find())
 		{
-			int killCount = Integer.parseInt(taskComplete.group(1));
-			String monster = taskComplete.group(2);
-			String xp = taskComplete.group(3);
-			int tasksCompleted = Integer.parseInt(taskComplete.group(4));
-			int pointsReceived = Integer.parseInt(taskComplete.group(5));
-			String totalPoints = taskComplete.group(6);
-			handleTaskComplete(killCount, monster, xp, tasksCompleted, pointsReceived, totalPoints);
+			pendingKillCount = Integer.parseInt(part1.group(1));
+			pendingMonster = part1.group(2);
+			pendingXp = part1.group(3);
+			awaitingCompletionPart2 = true;
+			return;
+		}
+
+		if (awaitingCompletionPart2)
+		{
+			Matcher part2 = TASK_COMPLETE_PART2_PATTERN.matcher(message);
+			if (part2.find())
+			{
+				awaitingCompletionPart2 = false;
+				int tasksCompleted = Integer.parseInt(part2.group(1).replace(",", ""));
+				int pointsReceived = Integer.parseInt(part2.group(2).replace(",", ""));
+				String totalPoints = part2.group(3);
+				handleTaskComplete(pendingKillCount, pendingMonster, pendingXp, tasksCompleted, pointsReceived, totalPoints);
+			}
 		}
 	}
 
