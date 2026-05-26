@@ -59,7 +59,9 @@ public class SlayerLoggerPlugin extends Plugin
 	private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
 	private static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
-	private static final Gson GSON = new Gson();
+
+	@Inject
+	private Gson gson;
 
 	@Inject
 	private Client client;
@@ -211,7 +213,7 @@ public class SlayerLoggerPlugin extends Plugin
 			return;
 		}
 
-		String json = GSON.toJson(payload);
+		String json = gson.toJson(payload);
 		Request request = new Request.Builder()
 			.url(url)
 			.post(RequestBody.create(JSON, json))
