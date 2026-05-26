@@ -194,6 +194,7 @@ public class SlayerLoggerPlugin extends Plugin
 		payload.put("xp", Integer.parseInt(xp.replace(",", "")));
 		payload.put("tasks", tasksCompleted);
 		payload.put("points", pointsReceived);
+		payload.put("total_points", Integer.parseInt(totalPoints.replace(",", "")));
 		sendWebhook(payload);
 	}
 
