@@ -191,6 +191,7 @@ public class SlayerLoggerPlugin extends Plugin
 		payload.put("message_type", "task completed");
 		payload.put("monster", monster);
 		payload.put("amount", killCount);
+		payload.put("xp", Integer.parseInt(xp.replace(",", "")));
 		payload.put("tasks", tasksCompleted);
 		payload.put("points", pointsReceived);
 		sendWebhook(payload);
