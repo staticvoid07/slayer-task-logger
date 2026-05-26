@@ -61,6 +61,7 @@ Fired when a task is finished.
   "message_type": "task completed",
   "monster": "blue dragons",
   "amount": 135,
+  "xp": 5400,
   "tasks": 100,
   "points": 20
 }
