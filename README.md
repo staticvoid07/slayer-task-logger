@@ -63,7 +63,8 @@ Fired when a task is finished.
   "amount": 135,
   "xp": 5400,
   "tasks": 100,
-  "points": 20
+  "points": 20,
+  "total_points": 500
 }
 ```
 
