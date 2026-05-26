@@ -49,10 +49,11 @@ public class SlayerLoggerPlugin extends Plugin
 		"Your new task is to kill (\\d+) (.+)\\."
 	);
 
-	// "You have completed your task! You killed 135 blue dragons. You gained 5,400 Slayer XP.
-	//  You've completed 100 tasks and received 20 points, giving you a total of 500; return to a Slayer master."
+	// "You have completed your task! You killed 267 Nechryael. You gained 56,280 xp
+	//  You've completed 3,733 tasks and received 15 points, giving you a total of 2,983; return to a Slayer master."
+	// Note: <br> between the xp line and "You've" is stripped by removeTags(), leaving no separator.
 	private static final Pattern TASK_COMPLETE_PATTERN = Pattern.compile(
-		"You have completed your task! You killed (\\d+) (.+?)\\. You gained ([\\d,]+) Slayer XP\\. " +
+		"You have completed your task! You killed (\\d+) (.+?)\\. You gained ([\\d,]+) (?:Slayer )?[Xx][Pp]\\.?\\s*" +
 		"You've completed (\\d+) tasks? and received (\\d+) points?, giving you a total of ([\\d,]+);"
 	);
 
