@@ -18,11 +18,31 @@ public interface SlayerLoggerConfig extends Config
 	}
 
 	@ConfigItem(
+		keyName = "dinkOnCapePerkProc",
+		name = "Dink on cape perk proc",
+		description = "Send a Dink notification when the slayer cape perk triggers"
+	)
+	default boolean dinkOnCapePerkProc()
+	{
+		return true;
+	}
+
+	@ConfigItem(
 		keyName = "dinkOnTaskReceived",
 		name = "Dink on task received",
 		description = "Send a Dink notification when a new slayer task is assigned"
 	)
 	default boolean dinkOnTaskReceived()
+	{
+		return true;
+	}
+
+	@ConfigItem(
+		keyName = "dinkOnTaskSkipped",
+		name = "Dink on task skipped",
+		description = "Send a Dink notification when a slayer task is skipped"
+	)
+	default boolean dinkOnTaskSkipped()
 	{
 		return true;
 	}
