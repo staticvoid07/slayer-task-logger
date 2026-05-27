@@ -57,6 +57,12 @@ public class SlayerLoggerPlugin extends Plugin
 		"Your new task is to kill (\\d+) (.+)\\."
 	);
 
+	// Konar: "You are to bring balance to 128 Fire Giants in the Giants' Den."
+	// or:   "You are to bring balance to 152 Jellies in Tapoyauik."
+	private static final Pattern TASK_RECEIVED_KONAR_PATTERN = Pattern.compile(
+		"You are to bring balance to (\\d+) (.+?) in (?:the )?.+\\."
+	);
+
 	// First chat message on task completion: "You have completed your task! You killed 267 Nechryael. You gained 56,280 xp"
 	private static final Pattern TASK_COMPLETE_PART1_PATTERN = Pattern.compile(
 		"You have completed your task! You killed (\\d+) (.+?)\\. You gained ([\\d,]+) (?:Slayer )?[Xx][Pp]\\.?"
@@ -70,8 +76,14 @@ public class SlayerLoggerPlugin extends Plugin
 	// Task cancelled message (GAMEMESSAGE or DIALOG)
 	private static final String TASK_CANCELLED_TEXT = "Your task has been cancelled.";
 
-	// Slayer cape perk proc dialog
+	// Superior creature spawn (GAMEMESSAGE)
+	private static final String SUPERIOR_SPAWN_TEXT = "A superior foe has appeared...";
+
+	// Slayer cape perk proc dialog (standard masters)
 	private static final String CAPE_PERK_PROC_TEXT = "I might be able to do you a favour if you want";
+
+	// Slayer cape perk proc dialog (Konar)
+	private static final String CAPE_PERK_PROC_TEXT_KONAR = "I can reward that";
 
 	private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 	private static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
@@ -139,7 +151,6 @@ public class SlayerLoggerPlugin extends Plugin
 			logWriter = null;
 		}
 		awaitingCompletionPart2 = false;
-		currentTaskName = "";
 		log.debug("Slayer Logger stopped!");
 	}
 
@@ -161,11 +172,6 @@ public class SlayerLoggerPlugin extends Plugin
 				currentOriginalAmount = client.getVarpValue(VarPlayerID.SLAYER_COUNT_ORIGINAL);
 				currentArea = lookupAreaName();
 			}
-		}
-		else
-		{
-			currentTaskName = "";
-			currentArea = "";
 		}
 	}
 
@@ -263,7 +269,7 @@ public class SlayerLoggerPlugin extends Plugin
 
 		String message = Text.removeTags(chatMessage.getMessage());
 
-		if (message.contains(CAPE_PERK_PROC_TEXT))
+		if (message.contains(CAPE_PERK_PROC_TEXT) || message.contains(CAPE_PERK_PROC_TEXT_KONAR))
 		{
 			handleCapePerkProc();
 			return;
@@ -275,11 +281,26 @@ public class SlayerLoggerPlugin extends Plugin
 			return;
 		}
 
+		if (message.contains(SUPERIOR_SPAWN_TEXT))
+		{
+			handleSuperiorSpawn();
+			return;
+		}
+
 		Matcher taskReceived = TASK_RECEIVED_PATTERN.matcher(message);
 		if (taskReceived.find())
 		{
 			int count = Integer.parseInt(taskReceived.group(1));
 			String monster = taskReceived.group(2);
+			handleTaskReceived(count, monster);
+			return;
+		}
+
+		Matcher taskReceivedKonar = TASK_RECEIVED_KONAR_PATTERN.matcher(message);
+		if (taskReceivedKonar.find())
+		{
+			int count = Integer.parseInt(taskReceivedKonar.group(1));
+			String monster = taskReceivedKonar.group(2);
 			handleTaskReceived(count, monster);
 			return;
 		}
@@ -312,9 +333,12 @@ public class SlayerLoggerPlugin extends Plugin
 	{
 		currentTaskName = monster;
 		currentOriginalAmount = count;
+		currentArea = lookupAreaName();
 
-		String entry = String.format("[%s] TASK RECEIVED: %s x%d",
-			LocalDateTime.now().format(FORMATTER), monster, count);
+		String areaStr = currentArea.isEmpty() ? "" : " | Area: " + currentArea;
+		String entry = String.format("[%s] TASK RECEIVED: %s x%d%s | Tasks: %d | Points: %d",
+			LocalDateTime.now().format(FORMATTER), monster, count, areaStr,
+			currentTasksCompleted, currentPoints);
 		writeLog(entry);
 
 		if (config.dinkOnTaskReceived())
@@ -331,6 +355,8 @@ public class SlayerLoggerPlugin extends Plugin
 		payload.put("message_type", "new task");
 		payload.put("monster", monster);
 		payload.put("amount", count);
+		payload.put("area", currentArea);
+		payload.put("tasks_completed", currentTasksCompleted);
 		payload.put("total_points", currentPoints);
 		sendWebhook(payload);
 	}
@@ -340,10 +366,9 @@ public class SlayerLoggerPlugin extends Plugin
 		String monster = currentTaskName.isEmpty() ? "unknown" : currentTaskName;
 		int amount = currentOriginalAmount;
 		String area = currentArea;
-		int points = currentPoints;
+		int points = client.getVarbitValue(VarbitID.SLAYER_POINTS);
 		int tasksCompleted = currentTasksCompleted;
 		int slayerMaster = currentSlayerMaster;
-		currentTaskName = "";
 
 		String entry = String.format("[%s] TASK SKIPPED: %s x%d | Area: %s | Points: %d | Tasks: %d | Master: %d",
 			LocalDateTime.now().format(FORMATTER), monster, amount,
@@ -375,11 +400,12 @@ public class SlayerLoggerPlugin extends Plugin
 		int tasksCompleted, int pointsReceived, String totalPoints)
 	{
 		int originalAmount = currentOriginalAmount;
-		currentTaskName = "";
+		String area = currentArea;
 
+		String areaStr = area.isEmpty() ? "" : " | Area: " + area;
 		String entry = String.format(
-			"[%s] TASK COMPLETE: %s | Assigned: %d | Killed: %d | XP: %s | Tasks completed: %d | Points: +%d | Total points: %s",
-			LocalDateTime.now().format(FORMATTER), monster, originalAmount, killCount, xp,
+			"[%s] TASK COMPLETE: %s%s | Assigned: %d | Killed: %d | XP: %s | Tasks completed: %d | Points: +%d | Total points: %s",
+			LocalDateTime.now().format(FORMATTER), monster, areaStr, originalAmount, killCount, xp,
 			tasksCompleted, pointsReceived, totalPoints
 		);
 		writeLog(entry);
@@ -400,6 +426,7 @@ public class SlayerLoggerPlugin extends Plugin
 		payload.put("monster", monster);
 		payload.put("amount", originalAmount);
 		payload.put("kills", killCount);
+		payload.put("area", area);
 		payload.put("xp", Integer.parseInt(xp.replace(",", "")));
 		payload.put("tasks", tasksCompleted);
 		payload.put("points", pointsReceived);
@@ -407,10 +434,46 @@ public class SlayerLoggerPlugin extends Plugin
 		sendWebhook(payload);
 	}
 
+	private void handleSuperiorSpawn()
+	{
+		ensureTaskStateSynced();
+		String monster = currentTaskName.isEmpty() ? "unknown" : currentTaskName;
+
+		String entry = String.format(
+			"[%s] SUPERIOR SPAWN: %s | Area: %s | Points: %d | Tasks: %d | Master: %d",
+			LocalDateTime.now().format(FORMATTER), monster,
+			currentArea.isEmpty() ? "none" : currentArea,
+			currentPoints, currentTasksCompleted, currentSlayerMaster);
+		writeLog(entry);
+
+		if (config.dinkOnSuperiorSpawn())
+		{
+			sendDinkNotification(
+				"Superior Slayer Creature",
+				String.format("Superior %s has appeared!", monster)
+			);
+		}
+
+		Map<String, Object> payload = new LinkedHashMap<>();
+		payload.put("username", getPlayerName());
+		payload.put("timestamp", Instant.now().toString());
+		payload.put("message_type", "superior spawn");
+		payload.put("monster", monster);
+		payload.put("amount", currentOriginalAmount);
+		payload.put("area", currentArea);
+		payload.put("total_points", currentPoints);
+		payload.put("tasks_completed", currentTasksCompleted);
+		payload.put("slayer_master", currentSlayerMaster);
+		sendWebhook(payload);
+	}
+
 	private void handleCapePerkProc()
 	{
+		ensureTaskStateSynced();
+		String monster = currentTaskName.isEmpty() ? "unknown" : currentTaskName;
+
 		String entry = String.format("[%s] CAPE PERK PROC: %s x%d | Area: %s | Points: %d | Tasks: %d | Master: %d",
-			LocalDateTime.now().format(FORMATTER), currentTaskName.isEmpty() ? "unknown" : currentTaskName,
+			LocalDateTime.now().format(FORMATTER), monster,
 			currentOriginalAmount, currentArea.isEmpty() ? "none" : currentArea,
 			currentPoints, currentTasksCompleted, currentSlayerMaster);
 		writeLog(entry);
@@ -424,13 +487,37 @@ public class SlayerLoggerPlugin extends Plugin
 		payload.put("username", getPlayerName());
 		payload.put("timestamp", Instant.now().toString());
 		payload.put("message_type", "cape perk proc");
-		payload.put("monster", currentTaskName.isEmpty() ? "unknown" : currentTaskName);
+		payload.put("monster", monster);
 		payload.put("amount", currentOriginalAmount);
 		payload.put("area", currentArea);
 		payload.put("total_points", currentPoints);
 		payload.put("tasks_completed", currentTasksCompleted);
 		payload.put("slayer_master", currentSlayerMaster);
 		sendWebhook(payload);
+	}
+
+	// Called before events that rely on currentTaskName to recover from a failed startup sync.
+	private void ensureTaskStateSynced()
+	{
+		if (!currentTaskName.isEmpty())
+		{
+			return;
+		}
+		int amount = client.getVarpValue(VarPlayerID.SLAYER_COUNT);
+		if (amount <= 0)
+		{
+			return;
+		}
+		String taskName = lookupTaskName();
+		if (taskName != null)
+		{
+			currentTaskName = taskName.toLowerCase();
+			currentOriginalAmount = client.getVarpValue(VarPlayerID.SLAYER_COUNT_ORIGINAL);
+			currentArea = lookupAreaName();
+			currentPoints = client.getVarbitValue(VarbitID.SLAYER_POINTS);
+			currentTasksCompleted = client.getVarbitValue(VarbitID.SLAYER_TASKS_COMPLETED);
+			currentSlayerMaster = client.getVarbitValue(VarbitID.SLAYER_MASTER);
+		}
 	}
 
 	private String getPlayerName()

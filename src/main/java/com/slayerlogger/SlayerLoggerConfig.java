@@ -28,6 +28,16 @@ public interface SlayerLoggerConfig extends Config
 	}
 
 	@ConfigItem(
+		keyName = "dinkOnSuperiorSpawn",
+		name = "Dink on superior spawn",
+		description = "Send a Dink notification when a superior slayer creature appears"
+	)
+	default boolean dinkOnSuperiorSpawn()
+	{
+		return true;
+	}
+
+	@ConfigItem(
 		keyName = "dinkOnTaskReceived",
 		name = "Dink on task received",
 		description = "Send a Dink notification when a new slayer task is assigned"
