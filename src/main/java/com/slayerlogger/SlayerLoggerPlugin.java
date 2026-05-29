@@ -34,12 +34,12 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.nio.file.Path;
-import java.util.List;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -538,10 +538,19 @@ public class SlayerLoggerPlugin extends Plugin
 		}
 
 		String json = gson.toJson(payload);
-		Request request = new Request.Builder()
-			.url(url)
-			.post(RequestBody.create(JSON, json))
-			.build();
+		Request request;
+		try
+		{
+			request = new Request.Builder()
+				.url(url)
+				.post(RequestBody.create(JSON, json))
+				.build();
+		}
+		catch (IllegalArgumentException e)
+		{
+			log.warn("Invalid webhook URL: {}", url);
+			return;
+		}
 
 		httpClient.newCall(request).enqueue(new Callback()
 		{
