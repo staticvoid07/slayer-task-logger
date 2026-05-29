@@ -48,7 +48,8 @@ import java.util.regex.Pattern;
 @PluginDescriptor(
 	name = "Slayer Task Logger",
 	description = "Logs slayer task assignments and completions to a file and notifies Dink",
-	tags = {"slayer", "log", "task", "tracker"}
+	tags = {"slayer", "log", "task", "tracker"},
+	warning = "This plugin can send slayer event data to an external webhook URL. The URL is configured by the user and defaults to disabled."
 )
 public class SlayerLoggerPlugin extends Plugin
 {
