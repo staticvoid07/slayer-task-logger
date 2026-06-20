@@ -73,6 +73,12 @@ public class SlayerLoggerPlugin extends Plugin
 		"You'?ve completed ([\\d,]+) tasks? and received ([\\d,]+) points?, giving you a total of ([\\d,]+);"
 	);
 
+	// TzHaar task special upgrade prompt
+	private static final String TZHAAR_UPGRADE_TEXT = "for an extra reward you could choose to slay TzTok-Jad or TzKal-Zuk";
+
+	// Accepted the Jad/Zuk upgrade
+	private static final String TZHAAR_UPGRADE_ACCEPTED_TEXT = "A wise choice";
+
 	// Task cancelled message (GAMEMESSAGE or DIALOG)
 	private static final String TASK_CANCELLED_TEXT = "Your task has been cancelled.";
 
@@ -121,6 +127,9 @@ public class SlayerLoggerPlugin extends Plugin
 	private int pendingKillCount;
 	private String pendingMonster;
 	private String pendingXp;
+
+	// Set when the TzHaar upgrade prompt is shown, cleared on choice or next task
+	private boolean awaitingTzhaarChoice = false;
 
 	@Override
 	protected void startUp() throws Exception
@@ -235,6 +244,7 @@ public class SlayerLoggerPlugin extends Plugin
 		{
 			currentTaskName = "";
 			awaitingCompletionPart2 = false;
+			awaitingTzhaarChoice = false;
 		}
 	}
 
@@ -268,6 +278,18 @@ public class SlayerLoggerPlugin extends Plugin
 		}
 
 		String message = Text.removeTags(chatMessage.getMessage());
+
+		if (message.contains(TZHAAR_UPGRADE_TEXT))
+		{
+			handleTzhaarTaskAssigned();
+			return;
+		}
+
+		if (awaitingTzhaarChoice && message.contains(TZHAAR_UPGRADE_ACCEPTED_TEXT))
+		{
+			handleTzhaarUpgradeAccepted();
+			return;
+		}
 
 		if (message.contains(CAPE_PERK_PROC_TEXT) || message.contains(CAPE_PERK_PROC_TEXT_KONAR))
 		{
@@ -331,6 +353,7 @@ public class SlayerLoggerPlugin extends Plugin
 
 	private void handleTaskReceived(int count, String monster)
 	{
+		awaitingTzhaarChoice = false;
 		currentTaskName = monster;
 		currentOriginalAmount = count;
 		currentArea = lookupAreaName();
@@ -359,6 +382,32 @@ public class SlayerLoggerPlugin extends Plugin
 		payload.put("tasks_completed", currentTasksCompleted);
 		payload.put("total_points", currentPoints);
 		sendWebhook(payload);
+	}
+
+	private void handleTzhaarTaskAssigned()
+	{
+		awaitingTzhaarChoice = true;
+		ensureTaskStateSynced();
+		if (!currentTaskName.isEmpty() && currentOriginalAmount > 0)
+		{
+			handleTaskReceived(currentOriginalAmount, currentTaskName);
+		}
+	}
+
+	private void handleTzhaarUpgradeAccepted()
+	{
+		awaitingTzhaarChoice = false;
+		String newTaskName = lookupTaskName();
+		if (newTaskName == null)
+		{
+			return;
+		}
+		newTaskName = newTaskName.toLowerCase();
+		int newAmount = client.getVarpValue(VarPlayerID.SLAYER_COUNT_ORIGINAL);
+		if (!newTaskName.equals(currentTaskName))
+		{
+			handleTaskReceived(newAmount, newTaskName);
+		}
 	}
 
 	private void handleTaskSkipped()
