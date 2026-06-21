@@ -74,7 +74,7 @@ public class SlayerLoggerPlugin extends Plugin
 	);
 
 	// TzHaar task special upgrade prompt
-	private static final String TZHAAR_UPGRADE_TEXT = "for an extra reward you could choose to slay TzTok-Jad or TzKal-Zuk";
+	private static final String TZHAAR_UPGRADE_TEXT = "Ah... Tzhaar...";
 
 	// Accepted the Jad/Zuk upgrade
 	private static final String TZHAAR_UPGRADE_ACCEPTED_TEXT = "A wise choice";
@@ -279,13 +279,16 @@ public class SlayerLoggerPlugin extends Plugin
 
 		String message = Text.removeTags(chatMessage.getMessage());
 
-		if (message.contains(TZHAAR_UPGRADE_TEXT))
+		if ((type == ChatMessageType.DIALOG || type == ChatMessageType.MESBOX)
+			&& message.contains(TZHAAR_UPGRADE_TEXT))
 		{
 			handleTzhaarTaskAssigned();
 			return;
 		}
 
-		if (awaitingTzhaarChoice && message.contains(TZHAAR_UPGRADE_ACCEPTED_TEXT))
+		if (awaitingTzhaarChoice
+			&& (type == ChatMessageType.DIALOG || type == ChatMessageType.MESBOX)
+			&& message.contains(TZHAAR_UPGRADE_ACCEPTED_TEXT))
 		{
 			handleTzhaarUpgradeAccepted();
 			return;
@@ -358,10 +361,15 @@ public class SlayerLoggerPlugin extends Plugin
 		currentOriginalAmount = count;
 		currentArea = lookupAreaName();
 
+		int livePoints = client.getVarbitValue(VarbitID.SLAYER_POINTS);
+		int liveTasksCompleted = client.getVarbitValue(VarbitID.SLAYER_TASKS_COMPLETED);
+		currentPoints = livePoints;
+		currentTasksCompleted = liveTasksCompleted;
+
 		String areaStr = currentArea.isEmpty() ? "" : " | Area: " + currentArea;
 		String entry = String.format("[%s] TASK RECEIVED: %s x%d%s | Tasks: %d | Points: %d",
 			LocalDateTime.now().format(FORMATTER), monster, count, areaStr,
-			currentTasksCompleted, currentPoints);
+			liveTasksCompleted, livePoints);
 		writeLog(entry);
 
 		if (config.dinkOnTaskReceived())
@@ -379,8 +387,8 @@ public class SlayerLoggerPlugin extends Plugin
 		payload.put("monster", monster);
 		payload.put("amount", count);
 		payload.put("area", currentArea);
-		payload.put("tasks_completed", currentTasksCompleted);
-		payload.put("total_points", currentPoints);
+		payload.put("tasks_completed", liveTasksCompleted);
+		payload.put("total_points", livePoints);
 		sendWebhook(payload);
 	}
 
