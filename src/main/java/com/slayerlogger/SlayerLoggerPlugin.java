@@ -134,7 +134,9 @@ public class SlayerLoggerPlugin extends Plugin
 	@Override
 	protected void startUp() throws Exception
 	{
-		Path logPath = RuneLite.RUNELITE_DIR.toPath().resolve("slayer-log.txt");
+		Path pluginDir = RuneLite.RUNELITE_DIR.toPath().resolve("slayer-task-logger");
+		pluginDir.toFile().mkdirs();
+		Path logPath = pluginDir.resolve("slayer-log.txt");
 		try
 		{
 			logWriter = new PrintWriter(new FileWriter(logPath.toFile(), true), true);
