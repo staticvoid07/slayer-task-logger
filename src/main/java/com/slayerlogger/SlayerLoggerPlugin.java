@@ -397,11 +397,13 @@ public class SlayerLoggerPlugin extends Plugin
 	private void handleTzhaarTaskAssigned()
 	{
 		awaitingTzhaarChoice = true;
-		ensureTaskStateSynced();
-		if (!currentTaskName.isEmpty() && currentOriginalAmount > 0)
+		String taskName = lookupTaskName();
+		if (taskName == null)
 		{
-			handleTaskReceived(currentOriginalAmount, currentTaskName);
+			return;
 		}
+		int amount = client.getVarpValue(VarPlayerID.SLAYER_COUNT_ORIGINAL);
+		handleTaskReceived(amount, taskName.toLowerCase());
 	}
 
 	private void handleTzhaarUpgradeAccepted()
